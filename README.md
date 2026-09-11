@@ -28,6 +28,7 @@ The object under test is an authorization control plane. The language-model plan
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest -q
+# coverage of src/trustagent must stay at or above 90%
 .venv/bin/python evaluation/run.py --repeats 30
 ```
 

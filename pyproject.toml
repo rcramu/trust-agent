@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
     "matplotlib>=3.9.0",
 ]
 
@@ -25,3 +26,4 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+addopts = "--cov=trustagent --cov-report=term-missing --cov-fail-under=90"
