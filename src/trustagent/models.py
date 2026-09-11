@@ -8,13 +8,16 @@ from typing import Any
 
 class AgentStatus(str, Enum):
     ACTIVE = "active"
+    SUSPENDED = "suspended"
     REVOKED = "revoked"
     EXPIRED = "expired"
+    RETIRED = "retired"
 
 
 class Outcome(str, Enum):
     ALLOW = "ALLOW"
     ALLOW_WITH_RESTRICTIONS = "ALLOW_WITH_RESTRICTIONS"
+    ADDITIONAL_VERIFICATION = "ADDITIONAL_VERIFICATION"
     REQUIRE_HUMAN_APPROVAL = "REQUIRE_HUMAN_APPROVAL"
     DENY = "DENY"
 
@@ -71,6 +74,7 @@ class Decision:
     latency_ms: float
     mode: str
     dimensions: dict[str, float] = field(default_factory=dict)
+    phases_ms: dict[str, float] = field(default_factory=dict)
 
     @property
     def autonomously_permitted(self) -> bool:

@@ -22,12 +22,12 @@ class AgentRegistry:
     def public_key(self, agent_id: str) -> EllipticCurvePublicKey | None:
         return self._public_keys.get(agent_id)
 
-    def revoke(self, agent_id: str) -> None:
+    def _with_status(self, agent_id: str, status: AgentStatus) -> None:
         record = self._records[agent_id]
         self._records[agent_id] = AgentRecord(
             agent_id=record.agent_id,
             provider=record.provider,
-            status=AgentStatus.REVOKED,
+            status=status,
             capabilities=record.capabilities,
             purpose=record.purpose,
             owner=record.owner,
@@ -35,6 +35,20 @@ class AgentRegistry:
             expires_at=record.expires_at,
             resource_trust=record.resource_trust,
         )
+
+    def revoke(self, agent_id: str) -> None:
+        self._with_status(agent_id, AgentStatus.REVOKED)
+
+    def suspend(self, agent_id: str) -> None:
+        self._with_status(agent_id, AgentStatus.SUSPENDED)
+
+    def retire(self, agent_id: str) -> None:
+        self._with_status(agent_id, AgentStatus.RETIRED)
+
+    def rotate_key(self, agent_id: str, public_key: EllipticCurvePublicKey) -> None:
+        if agent_id not in self._records:
+            raise KeyError(f"unknown agent: {agent_id}")
+        self._public_keys[agent_id] = public_key
 
     def status(self, agent_id: str, now: datetime | None = None) -> AgentStatus | None:
         record = self.get(agent_id)

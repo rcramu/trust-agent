@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from uuid import uuid4
 
 import jwt
 
@@ -22,6 +23,7 @@ def issue_delegation(
             "iss": issuer,
             "sub": subject,
             "scope": sorted(scope),
+            "jti": str(uuid4()),
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(seconds=ttl_seconds)).timestamp()),
         },

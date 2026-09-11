@@ -9,6 +9,7 @@ from trustagent.ats import (
     identity_score,
     resource_score,
 )
+from trustagent.gateway import EnforcementMode
 from trustagent.lab import SECURITY_AGENT, LabWorld
 from trustagent.models import AuthorizationRequest, Channel
 
@@ -67,3 +68,25 @@ def test_behavior_score_purpose_and_clamp():
         context={"behavior_deviation": 5.0},
     )
     assert behavior_score(record, injected) == 0.0
+
+
+def test_behavior_score_uses_recent_audit_denies():
+    lab = LabWorld()
+    record = lab.registry.get(SECURITY_AGENT)
+    gateway = lab.gateway(EnforcementMode.B3)
+    denied = AuthorizationRequest(
+        SECURITY_AGENT,
+        "r",
+        "database.admin",
+        lab.token(SECURITY_AGENT),
+        channel=Channel.MCP,
+    )
+    gateway.authorize(denied)
+    on_purpose = AuthorizationRequest(
+        SECURITY_AGENT,
+        "r",
+        "incident.read",
+        "t",
+        channel=Channel.MCP,
+    )
+    assert behavior_score(record, on_purpose, gateway.audit) == 50.0

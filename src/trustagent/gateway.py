@@ -62,6 +62,7 @@ class TrustAgentGateway:
         self.thresholds = thresholds or AtsThresholds()
         self.audit = AuditLog()
         self._seen_jti: set[str] = set()
+        self._revoked_grants: set[str] = set()
 
     def authorize(self, request: AuthorizationRequest) -> Decision:
         started = time.perf_counter()
@@ -74,6 +75,7 @@ class TrustAgentGateway:
             latency_ms=elapsed,
             mode=self.mode.value,
             dimensions=decision.dimensions,
+            phases_ms=decision.phases_ms,
         )
         self.audit.record(request, stamped)
         return stamped
@@ -82,14 +84,27 @@ class TrustAgentGateway:
         if self.mode is EnforcementMode.B1:
             return Decision(Outcome.ALLOW, "B1: no agent-specific checks", None, 0.0, self.mode.value)
 
+        started = time.perf_counter()
         token_claims, token_error = self._validate_token(request)
+        token_ms = (time.perf_counter() - started) * 1000.0
         if token_error:
-            return Decision(Outcome.DENY, token_error, None, 0.0, self.mode.value)
+            return Decision(Outcome.DENY, token_error, None, 0.0, self.mode.value, phases_ms={"token_ms": token_ms})
 
         if self.mode is EnforcementMode.B2:
-            return Decision(Outcome.ALLOW, "B2: token valid", None, 0.0, self.mode.value)
+            return Decision(Outcome.ALLOW, "B2: token valid", None, 0.0, self.mode.value, phases_ms={"token_ms": token_ms})
 
-        return self._trustagent(request, token_claims)
+        decision = self._trustagent(request, token_claims)
+        phases = dict(decision.phases_ms)
+        phases["token_ms"] = token_ms
+        return Decision(
+            decision.outcome,
+            decision.reason,
+            decision.ats,
+            0.0,
+            self.mode.value,
+            decision.dimensions,
+            phases,
+        )
 
     def _validate_token(self, request: AuthorizationRequest) -> tuple[dict[str, Any] | None, str | None]:
         try:
@@ -112,36 +127,45 @@ class TrustAgentGateway:
         status = self.registry.status(request.agent_id)
         if status is AgentStatus.REVOKED:
             return Decision(Outcome.DENY, "agent is revoked", 0.0, 0.0, self.mode.value)
+        if status is AgentStatus.SUSPENDED:
+            return Decision(Outcome.DENY, "agent is suspended", 0.0, 0.0, self.mode.value)
+        if status is AgentStatus.RETIRED:
+            return Decision(Outcome.DENY, "agent is retired", 0.0, 0.0, self.mode.value)
         if status is AgentStatus.EXPIRED:
             return Decision(Outcome.DENY, "agent identity expired", 0.0, 0.0, self.mode.value)
 
+        phases: dict[str, float] = {}
         card_ok = True
         if request.channel is Channel.A2A or request.card_jws:
+            started = time.perf_counter()
             card_ok, card_reason = self._verify_card(request, record)
+            phases["card_ms"] = (time.perf_counter() - started) * 1000.0
             if not card_ok:
-                return Decision(Outcome.DENY, card_reason, 0.0, 0.0, self.mode.value)
+                return Decision(Outcome.DENY, card_reason, 0.0, 0.0, self.mode.value, phases_ms=phases)
 
+        started = time.perf_counter()
         if request.delegation is not None:
             if not self._verify_delegation(request):
-                return Decision(Outcome.DENY, "delegation is not monotonic or not verifiable", 0.0, 0.0, self.mode.value)
+                return Decision(Outcome.DENY, "delegation is not monotonic or not verifiable", 0.0, 0.0, self.mode.value, phases_ms=phases)
         elif not self.policy.authorized(record, request.capability):
-            return Decision(Outcome.DENY, "capability is not authorized", 0.0, 0.0, self.mode.value)
+            return Decision(Outcome.DENY, "capability is not authorized", 0.0, 0.0, self.mode.value, phases_ms=phases)
+        phases["policy_ms"] = (time.perf_counter() - started) * 1000.0
 
         if request.channel is Channel.A2A:
             peer_status = self.registry.status(request.resource)
             if peer_status is not AgentStatus.ACTIVE:
-                return Decision(Outcome.DENY, "A2A peer is not an active registered agent", 0.0, 0.0, self.mode.value)
+                return Decision(Outcome.DENY, "A2A peer is not an active registered agent", 0.0, 0.0, self.mode.value, phases_ms=phases)
         elif not self.policy.resource_trusted(request.resource):
-            return Decision(Outcome.DENY, "resource is untrusted", 0.0, 0.0, self.mode.value)
+            return Decision(Outcome.DENY, "resource is untrusted", 0.0, 0.0, self.mode.value, phases_ms=phases)
 
         jti = token_claims.get("jti")
         if isinstance(jti, str):
             if jti in self._seen_jti:
-                return Decision(Outcome.DENY, "token replay detected", 0.0, 0.0, self.mode.value)
+                return Decision(Outcome.DENY, "token replay detected", 0.0, 0.0, self.mode.value, phases_ms=phases)
             self._seen_jti.add(jti)
 
         if self.mode is EnforcementMode.B3_STATIC:
-            return Decision(Outcome.ALLOW, "static policy passed", None, 0.0, self.mode.value)
+            return Decision(Outcome.ALLOW, "static policy passed", None, 0.0, self.mode.value, phases_ms=phases)
 
         weights = self.weights
         if self.mode is EnforcementMode.B3_NO_BEHAVIOR:
@@ -155,17 +179,19 @@ class TrustAgentGateway:
         lifetime = max(1, exp - iat)
         remaining = max(0.0, (exp - now_ts) / lifetime)
 
+        started = time.perf_counter()
         dims = {
             "I": identity_score(True and card_ok),
             "C": credential_score(valid=True, remaining_fraction=remaining, audience_ok=True),
             "A": authorization_score(True),
-            "B": behavior_score(record, request),
+            "B": behavior_score(record, request, self.audit),
             "R": resource_score(True),
             "X": context_score(request),
         }
         ats = weights.combine(dims["I"], dims["C"], dims["A"], dims["B"], dims["R"], dims["X"])
+        phases["ats_ms"] = (time.perf_counter() - started) * 1000.0
         outcome, reason = self._band(ats)
-        return Decision(outcome, reason, ats, 0.0, self.mode.value, dims)
+        return Decision(outcome, reason, ats, 0.0, self.mode.value, dims, phases)
 
     def _verify_card(self, request: AuthorizationRequest, record) -> tuple[bool, str]:
         if not request.card_jws:
@@ -196,13 +222,21 @@ class TrustAgentGateway:
             return False
         if claims.get("iss") != grant.issuer or claims.get("sub") != grant.subject:
             return False
+        grant_jti = claims.get("jti")
+        if isinstance(grant_jti, str) and grant_jti in self._revoked_grants:
+            return False
         return self.policy.delegation_monotonic(self.registry, grant, request.capability)
+
+    def revoke_delegation(self, grant_jti: str) -> None:
+        self._revoked_grants.add(grant_jti)
 
     def _band(self, ats: float) -> tuple[Outcome, str]:
         if ats >= self.thresholds.allow:
             return Outcome.ALLOW, "ATS allow"
         if ats >= self.thresholds.restrict:
             return Outcome.ALLOW_WITH_RESTRICTIONS, "ATS restrict"
+        if ats >= self.thresholds.verify:
+            return Outcome.ADDITIONAL_VERIFICATION, "ATS additional verification"
         if ats >= self.thresholds.approval:
             return Outcome.REQUIRE_HUMAN_APPROVAL, "ATS requires human approval"
         return Outcome.DENY, "ATS deny"

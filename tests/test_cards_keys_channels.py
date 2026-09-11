@@ -45,6 +45,18 @@ def test_keystore_duplicate_and_missing():
         keys.generate("one")
     with pytest.raises(KeyError, match="unknown key"):
         keys.private("missing")
+    rotated = keys.rotate("one")
+    assert rotated is not None
+    assert keys.public("one") == rotated
+
+
+def test_registry_rotate_unknown_agent():
+    lab = LabWorld()
+    with pytest.raises(KeyError, match="unknown agent"):
+        lab.registry.rotate_key("agent://missing", lab.keys.public(SECURITY_AGENT))
+    public = lab.keys.rotate(SECURITY_AGENT)
+    lab.registry.rotate_key(SECURITY_AGENT, public)
+    assert lab.registry.public_key(SECURITY_AGENT) == public
 
 
 def test_channels_wrap_authorize():

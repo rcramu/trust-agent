@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from trustagent.models import AgentRecord, AuthorizationRequest
+from trustagent.models import AgentRecord, AuthorizationRequest, Outcome
 
 
 @dataclass(frozen=True)
@@ -57,6 +57,7 @@ class AtsWeights:
 class AtsThresholds:
     allow: float = 90.0
     restrict: float = 75.0
+    verify: float = 60.0
     approval: float = 40.0
 
 
@@ -81,13 +82,27 @@ def authorization_score(authorized: bool) -> float:
     return 100.0 if authorized else 0.0
 
 
-def behavior_score(record: AgentRecord, request: AuthorizationRequest) -> float:
+def behavior_score(record: AgentRecord, request: AuthorizationRequest, audit: object | None = None) -> float:
     injected = request.context.get("behavior_deviation")
     if injected is not None:
         return 100.0 * (1.0 - max(0.0, min(1.0, float(injected))))
-    if request.capability.split(".")[0] in record.purpose:
-        return 100.0
-    return 40.0
+    base = 100.0 if request.capability.split(".")[0] in record.purpose else 40.0
+    events = getattr(audit, "events", None)
+    if events:
+        recent = [e for e in events[-8:] if e.agent_id == record.agent_id]
+        if recent:
+            withheld = sum(
+                1
+                for e in recent
+                if e.outcome
+                in {
+                    Outcome.DENY.value,
+                    Outcome.REQUIRE_HUMAN_APPROVAL.value,
+                    Outcome.ADDITIONAL_VERIFICATION.value,
+                }
+            )
+            base *= 1.0 - 0.5 * (withheld / len(recent))
+    return base
 
 
 def resource_score(trusted: bool) -> float:

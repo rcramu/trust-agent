@@ -39,7 +39,7 @@ def figure6(data: dict) -> None:
     ax.set_xticklabels([name for name, _ in groups])
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Prevention rate")
-    ax.set_title("Figure 6. Unauthorized-action prevention (n=30 per scenario)")
+    ax.set_title(f"Figure 6. Unauthorized-action prevention (n={data['repeats']} per scenario)")
     ax.legend(frameon=False)
     fig.tight_layout()
     fig.savefig(OUT / "figure-06-prevention.png", dpi=200)

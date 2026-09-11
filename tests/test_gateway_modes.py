@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import jwt
+
 from trustagent.ats import AtsThresholds
 from trustagent.cards import card_payload, sign_card
 from trustagent.gateway import EnforcementMode, TrustAgentGateway
@@ -257,3 +259,45 @@ def test_ats_requires_human_approval_on_high_deviation():
         )
     )
     assert decision.outcome is Outcome.REQUIRE_HUMAN_APPROVAL
+
+
+def test_ats_additional_verification_band():
+    lab = LabWorld()
+    decision = lab.gateway(EnforcementMode.B3).authorize(
+        AuthorizationRequest(
+            agent_id=SECURITY_AGENT,
+            resource=INCIDENT_READ,
+            capability="incident.read",
+            token=lab.token(SECURITY_AGENT),
+            channel=Channel.MCP,
+            context={"behavior_deviation": 0.7, "context_risk": 0.2},
+        )
+    )
+    assert decision.outcome is Outcome.ADDITIONAL_VERIFICATION
+    assert not decision.autonomously_permitted
+
+
+def test_suspended_retired_and_revoked_delegation():
+    lab = LabWorld()
+    gateway = lab.gateway(EnforcementMode.B3)
+    lab.registry.suspend(SECURITY_AGENT)
+    assert "suspended" in gateway.authorize(lab.legitimate_mcp()).reason
+    lab.registry.retire(SECURITY_AGENT)
+    assert "retired" in gateway.authorize(lab.legitimate_mcp()).reason
+
+    lab = LabWorld()
+    gateway = lab.gateway(EnforcementMode.B3)
+    grant = lab.delegation(SECURITY_AGENT, HELPER_AGENT, frozenset({"incident.read"}))
+    claims = jwt.decode(grant.compact_jws, options={"verify_signature": False})
+    gateway.revoke_delegation(claims["jti"])
+    denied = gateway.authorize(
+        AuthorizationRequest(
+            agent_id=HELPER_AGENT,
+            resource=INCIDENT_READ,
+            capability="incident.read",
+            token=lab.token(HELPER_AGENT),
+            channel=Channel.MCP,
+            delegation=grant,
+        )
+    )
+    assert "delegation" in denied.reason
