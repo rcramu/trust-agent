@@ -1,6 +1,6 @@
 # Evaluation harness
 
-Companion deposit for **TrustAgent**. Every number that will appear in manuscript Section 8 / Tables 6–7 must come from JSON written by this harness. Do not edit result cells by hand.
+Companion deposit for **TrustAgent**. Every number that will appear in manuscript Section 8 / Tables 6–10 / Table A.1 must come from JSON written by this harness. Do not edit result cells by hand.
 
 **Data folder:** [`evaluation/results/`](../evaluation/results/)
 
@@ -12,10 +12,11 @@ From the repository root:
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest -q
-.venv/bin/python evaluation/run.py --repeats 30
+.venv/bin/python evaluation/run.py --repeats 300
+.venv/bin/python evaluation/make_figures.py
 ```
 
-`--repeats` is the number of independent lab worlds per scenario × baseline. Default 30. The process generates a fresh P-256 key set for every trial.
+`--repeats` is the number of independent lab worlds per scenario × baseline. Default 300. The process generates a fresh P-256 key set for every trial. Host, schema, and RSS are recorded in the JSON `host` object (manuscript Appendix B).
 
 Output: `evaluation/results/approach_comparison.json` (`schema: trustagent-eval-v1`).
 
@@ -51,6 +52,8 @@ Legitimate controls L1 (MCP `incident.read`) and L2 (A2A with an honest card) me
 - `scenarios.A*.B*.prevention_rate` — fraction of trials that were not autonomously permitted
 - `summary.B*.authorization_quality` — precision / recall / F1 treating “should block” as the positive class (A1–A10 positive, L1–L2 negative)
 - `summary.B*.latency` — mean / median / stdev / p95 / p99 over all authorize() calls for that baseline
+- `summary.B*.phases` — token, Agent Card, policy, and ATS phase times when that path ran
+- `host` — platform, Python, CPU seconds, peak RSS
 - `ablation.A10` — B3 vs B3_STATIC vs B3_NO_BEHAVIOR vs B3_NO_RESOURCE (hypothesis H5)
 
 ## Mapping to the manuscript
@@ -59,6 +62,10 @@ Legitimate controls L1 (MCP `incident.read`) and L2 (A2A with an honest card) me
 |---|---|
 | Table 6 | `tables.table6` |
 | Table 7 | `tables.table7` |
+| Table 8 | `summary.*.authorization_quality` |
+| Table 9 | `ablation.A10` |
+| Table 10 | `tests` plus the supported/not wording in Section 8.5 |
+| Table A.1 | `scenarios` and `legitimate` |
 | Fisher tests (H1–H5) | `tests` |
 | Figure 6 | `evaluation/make_figures.py` → `figures/figure-06-prevention.png` |
 | Figure 7 | `evaluation/make_figures.py` → `figures/figure-07-latency.png` |

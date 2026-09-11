@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import platform
+import resource
 import statistics
 import sys
 from collections import defaultdict
@@ -126,11 +128,34 @@ def _confusion(true_attack: list[bool], predicted_block: list[bool]) -> dict[str
     }
 
 
+def _rss_bytes() -> int:
+    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # macOS reports bytes; Linux reports kibibytes.
+    if sys.platform == "darwin":
+        return int(usage)
+    return int(usage) * 1024
+
+
+def _cpu_seconds() -> float:
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    return float(usage.ru_utime + usage.ru_stime)
+
+
+def _warmup() -> None:
+    lab = LabWorld()
+    lab.gateway(EnforcementMode.B3).authorize(lab.legitimate_mcp())
+    lab.gateway(EnforcementMode.B3).authorize(lab.legitimate_a2a())
+
+
 def run_campaign(repeats: int) -> dict:
+    _warmup()
+    cpu_before = _cpu_seconds()
+    rss_before = _rss_bytes()
     scenarios: dict[str, dict] = {}
     labels: list[bool] = []
     blocked: dict[str, list[bool]] = defaultdict(list)
     latencies: dict[str, list[float]] = defaultdict(list)
+    phases: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
 
     for sid, builder in SCENARIOS.items():
         scenarios[sid] = {}
@@ -141,6 +166,8 @@ def run_campaign(repeats: int) -> dict:
                 decision = _decide(mode, builder)
                 samples.append(decision.latency_ms)
                 latencies[mode.value].append(decision.latency_ms)
+                for name, value in decision.phases_ms.items():
+                    phases[mode.value][name].append(value)
                 permitted = decision.autonomously_permitted
                 if permitted:
                     allowed += 1
@@ -162,6 +189,8 @@ def run_campaign(repeats: int) -> dict:
                 decision = _decide(mode, builder)
                 samples.append(decision.latency_ms)
                 latencies[mode.value].append(decision.latency_ms)
+                for name, value in decision.phases_ms.items():
+                    phases[mode.value][name].append(value)
                 if decision.autonomously_permitted:
                     allowed += 1
                 blocked[mode.value].append(not decision.autonomously_permitted)
@@ -186,6 +215,7 @@ def run_campaign(repeats: int) -> dict:
             "mean_attack_success_rate": success,
             "authorization_quality": _confusion(labels, blocked[name]),
             "latency": _latency_block(latencies[name]),
+            "phases": {phase: _latency_block(values) for phase, values in phases[name].items()},
         }
 
     ablation = {"A10": {}}
@@ -330,11 +360,19 @@ def run_campaign(repeats: int) -> dict:
             },
         },
     }
+    cpu_after = _cpu_seconds()
+    rss_after = _rss_bytes()
 
     return {
         "schema": "trustagent-eval-v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repeats": repeats,
+        "host": {
+            "platform": platform.platform(),
+            "python": sys.version.split()[0],
+            "cpu_seconds": cpu_after - cpu_before,
+            "max_rss_bytes": max(rss_before, rss_after),
+        },
         "baselines": [m.value for m in MODES],
         "scenarios": scenarios,
         "legitimate": legitimate,
@@ -347,7 +385,7 @@ def run_campaign(repeats: int) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the TrustAgent evaluation campaign")
-    parser.add_argument("--repeats", type=int, default=30)
+    parser.add_argument("--repeats", type=int, default=300)
     parser.add_argument(
         "--out",
         type=Path,

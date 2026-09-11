@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="480" viewBox="0 0 760 480" role="img" aria-label="Figure 1. TrustAgent architecture">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 z" fill="#1b4d6e"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <rect x="280" y="16" width="200" height="40" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="380.0" y="40.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">Human user</text>
+<line x1="380" y1="56" x2="380" y2="72" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="250" y="72" width="260" height="48" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="380.0" y="94" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">Identity provider</text>
+<text x="380.0" y="110" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#5f7c8a">OAuth 2.1 / OIDC</text>
+<line x1="380" y1="120" x2="380" y2="136" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="250" y="136" width="260" height="48" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="380.0" y="158" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">Agent runtime</text>
+<text x="380.0" y="174" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#5f7c8a">LLM + planner + memory</text>
+<line x1="380" y1="184" x2="380" y2="200" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="220" y="200" width="320" height="64" fill="#e8eef2" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="380.0" y="222" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">TrustAgent gateway</text>
+<text x="380.0" y="238" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#5f7c8a">identity · card · policy · ATS · revoke · audit</text>
+<line x1="300" y1="264" x2="190" y2="296" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="460" y1="264" x2="570" y2="296" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="90" y="296" width="200" height="48" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="190.0" y="324.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">A2A gateway</text>
+<rect x="470" y="296" width="200" height="48" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="570.0" y="324.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">MCP gateway</text>
+<line x1="190" y1="344" x2="190" y2="360" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="570" y1="344" x2="570" y2="360" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="90" y="360" width="200" height="40" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="190.0" y="384.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">Peer agents B / C</text>
+<rect x="470" y="360" width="200" height="40" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="570.0" y="384.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">MCP tools</text>
+<line x1="570" y1="400" x2="570" y2="416" stroke="#1b4d6e" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="470" y="416" width="200" height="40" fill="#fffdf8" stroke="#1b4d6e" stroke-width="1.4"/>
+<text x="570.0" y="440.0" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1c2328">Enterprise APIs</text>
+</svg>

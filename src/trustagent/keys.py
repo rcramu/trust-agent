@@ -25,6 +25,10 @@ class KeyStore:
         self._private[name] = key
         return key.public_key()
 
+    def rotate(self, name: str) -> EllipticCurvePublicKey:
+        self._private.pop(name, None)
+        return self.generate(name)
+
     def private(self, name: str) -> EllipticCurvePrivateKey:
         try:
             return self._private[name]

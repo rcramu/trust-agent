@@ -7,7 +7,7 @@ The object under test is an authorization control plane. The language-model plan
 ## What is implemented
 
 - Ephemeral P-256 / ES256 keys (generated in memory; never committed)
-- Agent registry and NHI status (active / revoked / expired)
+- Agent registry and NHI status (active / suspended / revoked / expired / retired)
 - Lab identity provider: audience-bound JWTs and PKCE (S256) authorization-code exchange
 - JWS Agent Cards with declared-versus-registered capability comparison
 - Capability policy, monotonic delegation, token `jti` replay cache
@@ -29,10 +29,30 @@ python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest -q
 # coverage of src/trustagent must stay at or above 90%
-.venv/bin/python evaluation/run.py --repeats 30
+.venv/bin/python evaluation/run.py --repeats 300
 ```
 
 Results: [`evaluation/results/approach_comparison.json`](evaluation/results/approach_comparison.json). Figures 6–7: `python evaluation/make_figures.py`. How to read them: [`docs/eval.md`](docs/eval.md).
+
+## Results UI
+
+A React page reads the same JSON and shows Tables 6–7, per-scenario cells, ATS ablation, and Fisher tests. Serve it with Docker Compose (HTTP on localhost, no TLS, no credentials):
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:8080. Rebuild after a new `evaluation/run.py` campaign so the image picks up the JSON, or use “Load another campaign JSON” in the page.
+
+Without Docker:
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+Open http://localhost:5173.
 
 ## Enforcement modes
 
@@ -45,7 +65,7 @@ Results: [`evaluation/results/approach_comparison.json`](evaluation/results/appr
 | B3_NO_BEHAVIOR | B3, ATS with \(w_B = 0\) |
 | B3_NO_RESOURCE | B3, ATS with \(w_R = 0\) |
 
-An unauthorized action is counted as prevented when the outcome is `DENY` or `REQUIRE_HUMAN_APPROVAL`.
+An unauthorized action is counted as prevented when it is not autonomously permitted (`DENY`, `ADDITIONAL_VERIFICATION`, or `REQUIRE_HUMAN_APPROVAL`).
 
 ## Credentials
 
